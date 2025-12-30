@@ -103,8 +103,8 @@ export default function App() {
     let projectedPM = currentForecast;
     const windImpact = Math.sin((stats.wind?.angle || 0) * (Math.PI / 180)); 
     
-    for (let i = 1; i <= 15; i++) {
-        projectedPM = projectedPM + (windImpact * 1.5) + (Math.random() * 1 - 0.5); 
+    for (let i = 1; i <= 30; i++) {
+        projectedPM = projectedPM + (windImpact * 1.2) + (Math.random() * 1 - 0.5); 
         if(projectedPM < 0) projectedPM = 0;
         
         const futureTime = new Date(now + i * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -270,10 +270,10 @@ export default function App() {
                         </div>
                     </GlassCard>
 
-                    {/* CHART 2: Future Forecast (15 Mins) */}
+                    {/* CHART 2: Future Forecast (30 Mins) */}
                     <GlassCard className="flex flex-col relative h-full">
                         <div className="flex justify-between items-center mb-6">
-                            <div><h3 className="text-lg font-semibold text-white">15-Minute Forecast</h3><p className="text-sm text-slate-400">Wind-Adjusted Trajectory</p></div>
+                            <div><h3 className="text-lg font-semibold text-white">30-Minute Forecast</h3><p className="text-sm text-slate-400">Wind-Adjusted Trajectory</p></div>
                         </div>
                         <div className="flex-1 w-full min-h-0">
                              <ResponsiveContainer width="100%" height="100%">
