@@ -109,14 +109,17 @@ function Building({ position, stage }) {
 function Crane() { return (<group position={[-3,0,-3]}><mesh position={[0,2,0]}><boxGeometry args={[0.4 ,4.5,0.6]} /><meshStandardMaterial color="#facc15" /></mesh><mesh position={[1,3.25,0]}><boxGeometry args={[3,0.25,0.3]} /><meshStandardMaterial color="#facc15" /></mesh></group>); }
 
 /* --- SCENE LOGIC (The Brain) --- */
-function Scene({ paused, setMetrics, nodes = [], onDataUpdate }) { // NEW PROP: onDataUpdate
+function Scene({ paused, setMetrics, nodes = [], onDataUpdate }) {
   const [dust, setDust] = useState(0.15); 
   const [state, setState] = useState(STATES.NORMAL);
-  const [wind, setWind] = useState({ name: "N", angle: 0 }); 
+  // ADDED: Speed initialized to 14.5
+  const [wind, setWind] = useState({ name: "N", angle: 0, speed: 14.5 }); 
   const [sprayIntensity, setSprayIntensity] = useState(0);
+  // ADDED: Humidity initialized to 58%
+  const [humidity, setHumidity] = useState(58);
 
   const lastUpdate = useRef(0);
-  const lastSync = useRef(0); // For dashboard sync
+  const lastSync = useRef(0);
   const windTimer = useRef(0);
   const mitigationTimer = useRef(0); 
   const recoveryTimer = useRef(0);
@@ -130,13 +133,24 @@ function Scene({ paused, setMetrics, nodes = [], onDataUpdate }) { // NEW PROP: 
     windTimer.current += 1;
     if (windTimer.current > 40) { 
       windTimer.current = 0;
-      setWind(prev => ({ ...prev, angle: (prev.angle + 45) % 360, name: "VAR" }));
+      // UPDATE: Change Direction AND Speed together
+      const newSpeed = 8 + Math.random() * 25; // Random speed between 8 and 33 km/h
+      setWind(prev => ({ 
+          ...prev, 
+          angle: (prev.angle + 45) % 360, 
+          name: "VAR",
+          speed: newSpeed 
+      }));
     }
+
+    // UPDATE: Slowly drift humidity (Brownian motion)
+    setHumidity(h => Math.max(30, Math.min(85, h + (Math.random() - 0.5) * 0.8)));
 
     const noise = (Math.random() - 0.5) * 6; 
     const currentPM25 = 20 + dust * 120 + noise; 
     const pm10 = currentPM25 * (1.5 + Math.random() * 0.2);
-    const predictedPM25 = currentPM25 * 1.1 + (Math.random() * 10);
+    // Forecast now slightly influenced by wind speed (logic only, not visual)
+    const predictedPM25 = currentPM25 * 1.1 + (Math.random() * 10) + (wind.speed * 0.2);
     const isPredictiveSpike = predictedPM25 > 75; 
 
     let emission = 0.4; 
@@ -173,17 +187,13 @@ function Scene({ paused, setMetrics, nodes = [], onDataUpdate }) { // NEW PROP: 
     });
 
     setSprayIntensity(state === STATES.MITIGATION ? 1.0 : state === STATES.PREDICTIVE ? 0.6 : 0);
-    setMetrics({ pm25: currentPM25, pm10, predictedPM: predictedPM25, state, wind, sprayIntensity });
+    
+    // PASS DATA UP
+    setMetrics({ pm25: currentPM25, pm10, predictedPM: predictedPM25, state, wind, sprayIntensity, humidity });
 
-    // --- SEND DATA TO DASHBOARD (Once per second) ---
     if (t - lastSync.current > 1.0 && onDataUpdate) {
         lastSync.current = t;
-        onDataUpdate({
-            pm10: pm10,
-            predicted: predictedPM25,
-            state: state,
-            wind: wind
-        });
+        onDataUpdate({ pm10, predicted: predictedPM25, state, wind });
     }
   });
 
@@ -193,14 +203,12 @@ function Scene({ paused, setMetrics, nodes = [], onDataUpdate }) { // NEW PROP: 
       <directionalLight position={[10,20,5]} intensity={1.5} />
       <OrbitControls enableDamping />
       <gridHelper args={[30,30,"#555", "#888"]} />
-      
       <mesh position={[0,-0.45,0]}><boxGeometry args={[30, 0.9, 30]} /><meshStandardMaterial color="#8c7b64" /></mesh>
       <Building position={[-2,0,-3]} stage={1} />
       <Building position={[4,0,3]} stage={2} />
       <Crane />
       <Dust intensity={dust} windAngle={wind.angle} paused={paused} />
       {[[-6,0,0],[6,0,0],[0,0,-6],[0,0,6]].map((p,i)=>( <Sprinkler key={i} pos={p} intensity={sprayIntensity} paused={paused} /> ))}
-      
       {nodes.map(node => (
         <SensorNode key={node.id} position={[node.x || 0, 0, node.z || 0]} active={node.status === 'hazardous' || node.status === 'unhealthy'} label={node.id} />
       ))}
@@ -241,11 +249,23 @@ export default function DustSimulation({ nodes = [], onDataUpdate }) { // Added 
           STATUS: {metrics.state}
         </div>
 
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:5, fontSize:12 }}>
+       <div style={{ display:"grid", gridTemplateColumns:"1.2fr 1fr", gap:5, fontSize:12 }}>
+          {/* Row 1: PM Data */}
           <div>Current PM2.5:</div><div style={{ fontWeight:"bold" }}>{metrics.pm25?.toFixed(1)}</div>
           <div>Current PM10:</div><div style={{ fontWeight:"bold" }}>{metrics.pm10?.toFixed(1)}</div>
-          <div style={{ color:"#2563eb", fontWeight:"bold" }}>Forecast (30m):</div><div style={{ color:"#2563eb", fontWeight:"bold" }}>{metrics.predictedPM?.toFixed(0)}</div>
-          <div>Wind Vector:</div><div>{metrics.wind?.name} ({metrics.wind?.angle}°)</div>
+          
+          {/* Row 2: Prediction */}
+          <div style={{ color:"#2563eb", fontWeight:"bold" }}>Forecast (30m):</div>
+          <div style={{ color:"#2563eb", fontWeight:"bold" }}>{metrics.predictedPM?.toFixed(0)}</div>
+          
+          {/* Row 3: Environmental Data (New) */}
+          <div>Wind Vector:</div>
+          <div>{metrics.wind?.name} <span style={{opacity:0.7, fontSize:10}}>({metrics.wind?.speed?.toFixed(1)}kph)</span></div>
+          
+          <div>Humidity:</div>
+          <div style={{ color:"#38bdf8", fontWeight:"bold" }}>{metrics.humidity?.toFixed(0)}%</div>
+
+          {/* Row 4: System Status */}
           <div>Water Output:</div><div>{(metrics.sprayIntensity * 100)?.toFixed(0)}%</div>
         </div>
         <hr style={{ borderColor:"#cbd5e1", margin:"12px 0" }} />

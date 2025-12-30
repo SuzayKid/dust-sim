@@ -97,33 +97,34 @@ export default function App() {
     const currentForecast = calculatedForecast;
     
     // --- 1. STABLE FUTURE FORECAST ---
-    // --- 1. DYNAMIC FUTURE FORECAST ---
+   // --- 1. DYNAMIC FUTURE FORECAST ---
     const futurePoints = [];
     futurePoints.push({ time: "Now", predicted: currentForecast, name: "Forecast" }); 
 
     let projectedPM = currentForecast;
     
-    // We create a "Scenario" where wind varies over the 30 minutes
-    // A sine wave creates a natural "gusting" look (slow up and down)
-    const randomPhase = Math.random() * Math.PI; // Random start point for the wave
-
+    // THIS is the new "Weather Pattern" Logic
+    // 'slowTimeShift' uses the current time to move the wave slowly (animation),
+    // instead of jittering randomly every frame.
+    const slowTimeShift = now / 10000; 
+    
+    // Loop 30 times for a 30-minute forecast
     for (let i = 1; i <= 30; i++) {
-        // 1. The Trend: The base wind direction impact
-        const baseWindImpact = Math.sin((stats.wind?.angle || 0) * (Math.PI / 180)) * 1.48;
+        // A. The Trend: Driven by your Real Wind Direction
+        // If wind blows towards sensor, graph goes UP. If away, graph goes DOWN.
+        const baseWindImpact = Math.sin((stats.wind?.angle || 0) * (Math.PI / 180)) * 1.5;
         
-        // 2. The Variable: A slow wave to simulate changing weather (Not jitter!)
-        // 'i * 0.15' makes the wave slow and long (spanning the 30 mins)
-        const weatherVariation = Math.sin((i * 0.2) + randomPhase) * 2.0;
+        // B. The Fluctuation: A smooth Cosine wave to simulate weather systems
+        // (i * 0.2) controls the width of the wave
+        // slowTimeShift makes the wave "travel" across the screen slowly
+        const weatherVariation = Math.cos((i * 0.2) + slowTimeShift) * 3.0;
 
-        // Combine them ok
+        // Combine starting point + wind trend + weather curve
         projectedPM = projectedPM + baseWindImpact + weatherVariation;
 
-        // Prevent negative dust
+        // Safety: Dust can't be negative
         if(projectedPM < 0) projectedPM = 0;
         
-        // Add a "Confidence Interval" look? (Optional: Keep it smooth)
-        // We do NOT add random noise here. Keep it smooth to contrast the left graph.
-
         const futureTime = new Date(now + i * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         futurePoints.push({ time: futureTime, predicted: projectedPM, name: "Forecast" });
     }
@@ -316,7 +317,7 @@ export default function App() {
                     </div>
                     <div className="text-center">
                         <h3 className="text-xl font-bold text-white mb-1">Under Development</h3>
-                        <p className="text-sm text-slate-400">This module is part of the Phase 2 rollout.</p>
+                        <p className="text-sm text-slate-400">This module is under development.</p>
                     </div>
                 </div>
             )}
