@@ -109,13 +109,13 @@ export default function App() {
 
     for (let i = 1; i <= 30; i++) {
         // 1. The Trend: The base wind direction impact
-        const baseWindImpact = Math.sin((stats.wind?.angle || 0) * (Math.PI / 180)) * 1.5;
+        const baseWindImpact = Math.sin((stats.wind?.angle || 0) * (Math.PI / 180)) * 1.48;
         
         // 2. The Variable: A slow wave to simulate changing weather (Not jitter!)
         // 'i * 0.15' makes the wave slow and long (spanning the 30 mins)
         const weatherVariation = Math.sin((i * 0.2) + randomPhase) * 2.0;
 
-        // Combine them
+        // Combine them ok
         projectedPM = projectedPM + baseWindImpact + weatherVariation;
 
         // Prevent negative dust
