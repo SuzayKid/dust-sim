@@ -97,17 +97,34 @@ export default function App() {
     const currentForecast = calculatedForecast;
     
     // --- 1. STABLE FUTURE FORECAST ---
+    // --- 1. DYNAMIC FUTURE FORECAST ---
     const futurePoints = [];
     futurePoints.push({ time: "Now", predicted: currentForecast, name: "Forecast" }); 
 
     let projectedPM = currentForecast;
-    const windImpact = Math.sin((stats.wind?.angle || 0) * (Math.PI / 180)); 
     
+    // We create a "Scenario" where wind varies over the 30 minutes
+    // A sine wave creates a natural "gusting" look (slow up and down)
+    const randomPhase = Math.random() * Math.PI; // Random start point for the wave
+
     for (let i = 1; i <= 30; i++) {
-        projectedPM = projectedPM + (windImpact * 1.2) + (Math.random() * 1 - 0.5); 
+        // 1. The Trend: The base wind direction impact
+        const baseWindImpact = Math.sin((stats.wind?.angle || 0) * (Math.PI / 180)) * 1.48;
+        
+        // 2. The Variable: A slow wave to simulate changing weather (Not jitter!)
+        // 'i * 0.15' makes the wave slow and long (spanning the 30 mins)
+        const weatherVariation = Math.sin((i * 0.2) + randomPhase) * 2.0;
+
+        // Combine them ok
+        projectedPM = projectedPM + baseWindImpact + weatherVariation;
+
+        // Prevent negative dust
         if(projectedPM < 0) projectedPM = 0;
         
-        const futureTime = new Date(now + i * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        // Add a "Confidence Interval" look? (Optional: Keep it smooth)
+        // We do NOT add random noise here. Keep it smooth to contrast the left graph.
+
+        const futureTime = new Date(now + i * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         futurePoints.push({ time: futureTime, predicted: projectedPM, name: "Forecast" });
     }
     setFutureData(futurePoints);
