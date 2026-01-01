@@ -81,48 +81,31 @@ export default function App() {
   const ALERT_THRESHOLD = 40; 
   const CHART_Y_DOMAIN = [0, 120];
 
-  const handleSimUpdate = (stats) => {
-    setSimStats(stats); 
+  const lastState = useRef("NORMAL"); 
+  const hazardStartTime = useRef(null); // Timer to track how long danger lasts
 
+ const handleSimUpdate = (stats) => {
+    setSimStats(stats); 
     const now = Date.now();
     const currentPM = stats.pm10;
     
-    // FIX: Reduced Multiplier to 1.05 (5% margin) as requested
-    // Forecast = Actual * 1.05 + Small Random Noise
+    // --- 1. PREDICTION LOGIC ---
     let calculatedForecast = (currentPM * 1.05) + (Math.random() * 3 - 1.5);
-    
-    // Safety check to prevent it dropping below actual by accident
     if (calculatedForecast < currentPM) calculatedForecast = currentPM + 0.5;
-
     const currentForecast = calculatedForecast;
-    
-    // --- 1. STABLE FUTURE FORECAST ---
-   // --- 1. DYNAMIC FUTURE FORECAST ---
+
     const futurePoints = [];
     futurePoints.push({ time: "Now", predicted: currentForecast, name: "Forecast" }); 
 
     let projectedPM = currentForecast;
-    
-    // THIS is the new "Weather Pattern" Logic
-    // 'slowTimeShift' uses the current time to move the wave slowly (animation),
-    // instead of jittering randomly every frame.
     const slowTimeShift = now / 10000; 
     
-    // Loop 30 times for a 30-minute forecast
     for (let i = 1; i <= 30; i++) {
-        // A. The Trend: Driven by your Real Wind Direction
-        // If wind blows towards sensor, graph goes UP. If away, graph goes DOWN.
+        // Curve Logic
         const baseWindImpact = Math.sin((stats.wind?.angle || 0) * (Math.PI / 180)) * 1.5;
-        
-        // B. The Fluctuation: A smooth Cosine wave to simulate weather systems
-        // (i * 0.2) controls the width of the wave
-        // slowTimeShift makes the wave "travel" across the screen slowly
         const weatherVariation = Math.cos((i * 0.2) + slowTimeShift) * 3.0;
 
-        // Combine starting point + wind trend + weather curve
         projectedPM = projectedPM + baseWindImpact + weatherVariation;
-
-        // Safety: Dust can't be negative
         if(projectedPM < 0) projectedPM = 0;
         
         const futureTime = new Date(now + i * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -130,31 +113,47 @@ export default function App() {
     }
     setFutureData(futurePoints);
 
-    // --- 2. LOGGING LOGIC ---
+    // --- 2. INTELLIGENT LOGGING & ESCALATION ---
     let logToAdd = null;
+    const currentState = stats.state;
 
-    if (currentForecast > ALERT_THRESHOLD) {
-        isHazardous.current = true;
-        if (now - lastLogTime.current > 4000) {
+    // A. Start/Stop Danger Timer
+    if ((currentState === "MITIGATION" || currentState === "PREDICTIVE_ACTUATION") && !hazardStartTime.current) {
+        hazardStartTime.current = now;
+    } else if (currentState === "NORMAL") {
+        hazardStartTime.current = null;
+    }
+
+    // B. State Transition Logs (Normal Alerts)
+    if (currentState !== lastState.current) {
+        if (currentState === "MITIGATION") {
             logToAdd = { 
                 id: now, 
                 time: new Date().toLocaleTimeString(), 
                 type: "ALERT", 
-                message: `PREDICTION: High Dust Inbound (${currentForecast.toFixed(0)} µg/m³)` 
+                message: `Threshold Breached. Automated Sprinklers Activated.` 
             };
-            lastLogTime.current = now;
         }
-    } 
-    else {
-        if (isHazardous.current === true) {
+        else if (currentState === "NORMAL" && lastState.current !== "NORMAL") {
             logToAdd = { 
                 id: now, 
                 time: new Date().toLocaleTimeString(), 
                 type: "SUCCESS", 
-                message: `Mitigation Complete. Air Quality Stabilized.` 
+                message: `Air Quality Stabilized. System returning to Standby.` 
             };
-            isHazardous.current = false; 
-            lastLogTime.current = now;
+        }
+        lastState.current = currentState;
+    }
+
+    // C. Critical Escalation (If danger > 15s)
+    if (hazardStartTime.current && (now - hazardStartTime.current > 15000)) {
+        if ((now - hazardStartTime.current) % 15000 < 1000) {
+            logToAdd = { 
+                id: now, 
+                time: new Date().toLocaleTimeString(), 
+                type: "ALERT", 
+                message: `CRITICAL: Mitigation Ineffective. Recommended Action: Suspend Heavy Earthworks.` 
+            };
         }
     }
 
