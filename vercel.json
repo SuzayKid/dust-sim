@@ -4,12 +4,12 @@
       "source": "/(.*)",
       "headers": [
         {
-          "key": "X-Frame-Options",
-          "value": "ALLOW-FROM https://www.canva.com"
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://www.canva.com https://canva.com;"
         },
         {
-          "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' https://canva.com https://*.canva.com;"
+          "key": "X-Frame-Options",
+          "value": "ALLOWALL"
         }
       ]
     }
