@@ -81,10 +81,12 @@ export default function App() {
   const ALERT_THRESHOLD = 40; 
   const CHART_Y_DOMAIN = [0, 120];
 
+  // KEEP THESE REFS AT THE TOP OF YOUR COMPONENT
   const lastState = useRef("NORMAL"); 
-  const hazardStartTime = useRef(null); // Timer to track how long danger lasts
+  const hazardStartTime = useRef(null); 
 
- const handleSimUpdate = (stats) => {
+  // --- REPLACE YOUR handleSimUpdate WITH THIS FIXED VERSION ---
+  const handleSimUpdate = (stats) => {
     setSimStats(stats); 
     const now = Date.now();
     const currentPM = stats.pm10;
@@ -101,7 +103,6 @@ export default function App() {
     const slowTimeShift = now / 10000; 
     
     for (let i = 1; i <= 30; i++) {
-        // Curve Logic
         const baseWindImpact = Math.sin((stats.wind?.angle || 0) * (Math.PI / 180)) * 1.5;
         const weatherVariation = Math.cos((i * 0.2) + slowTimeShift) * 3.0;
 
@@ -113,9 +114,9 @@ export default function App() {
     }
     setFutureData(futurePoints);
 
-    // --- 2. INTELLIGENT LOGGING & ESCALATION ---
+    // --- 2. INTELLIGENT LOGGING (FIXED) ---
     let logToAdd = null;
-    const currentState = stats.state;
+    const currentState = stats.state; // e.g., "NORMAL", "PREDICTIVE_ACTUATION", "MITIGATION"
 
     // A. Start/Stop Danger Timer
     if ((currentState === "MITIGATION" || currentState === "PREDICTIVE_ACTUATION") && !hazardStartTime.current) {
@@ -124,14 +125,24 @@ export default function App() {
         hazardStartTime.current = null;
     }
 
-    // B. State Transition Logs (Normal Alerts)
+    // B. State Transition Logs
     if (currentState !== lastState.current) {
+        
+        // FIX: Check for BOTH Mitigation AND Predictive states
         if (currentState === "MITIGATION") {
             logToAdd = { 
                 id: now, 
                 time: new Date().toLocaleTimeString(), 
                 type: "ALERT", 
-                message: `Threshold Breached. Automated Sprinklers Activated.` 
+                message: `Threshold Breached. Full-Power Sprinklers Activated.` 
+            };
+        }
+        else if (currentState === "PREDICTIVE_ACTUATION") {
+            logToAdd = { 
+                id: now, 
+                time: new Date().toLocaleTimeString(), 
+                type: "ACTION", // Use ACTION (Blue/Cyan) for Predictive to differentiate
+                message: `AI Forecast: High Dust Inbound. Pre-wetting Active.` 
             };
         }
         else if (currentState === "NORMAL" && lastState.current !== "NORMAL") {
